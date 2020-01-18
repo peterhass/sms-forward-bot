@@ -9,6 +9,7 @@ Practical uses:
 ## Install
 
 - Install HTTPie
+- Install jq
 - Telegram: Create bot in bot father
 - Add bot to your telegram group (or create a new one)
 - Gather chat id: `TOKEN="place token here" curl https://api.telegram.org/bot${TOKEN}/getUpdates`
