@@ -4,7 +4,9 @@ Forwards all SMS received on Netgear LB1110 to a telegram group.
 Practical uses:
 - "Redirect" two factor authentication messages to telegram
 
-**Important note**: Due to limitations in LB1110's software, every forwarded SMS gets deleted on the modem.
+**Important notes**: 
+- Due to limitations in LB1110's software, every forwarded SMS gets deleted on the modem.
+- Modem password and sms are transmitted over http (not encrypted)
 
 ## Install
 
