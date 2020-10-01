@@ -28,6 +28,9 @@ mailer() {
 mailer_process() {
   echo "mailer_process: $1"
   # send out telegram notification
+
+  echo $1 | jq ".[]"
+  # $1 will be json, so we can use jq to split it up
 }
 
 # collects sms and adds them to the queue
@@ -45,9 +48,16 @@ collector() {
 }
 
 collector_find() {
-  # receive sms here
-  # return empty str if nothing is there
-  date
+  # load sms into $data
+  data=$(cat ./beispiel.json)
+
+  echo $data \
+    | jq -r 'to_entries | .[] | .key' \
+    | while read smsindex; do
+    echo $(echo $data | jq -c -r ".[$smsindex]")
+
+    # modem: delete sms after output
+  done
 }
 
 echo "Starting collector"
