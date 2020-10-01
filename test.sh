@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+source .env.local
+TELEGRAM_BOT_BASE="https://api.telegram.org/bot$TELEGRAM_TOKEN"
+
 PIPE="$1"
 
 if ! [[ -p "$PIPE" ]]; then
@@ -25,12 +28,36 @@ mailer() {
   done
 }
 
-mailer_process() {
-  echo "mailer_process: $1"
-  # send out telegram notification
+push_queue() {
+  echo "Pushing to queue"
 
-  echo $1 | jq ".[]"
-  # $1 will be json, so we can use jq to split it up
+  # TODO: handle lock because multiple 
+  # TODO:  processes may call this fn
+  echo $1 > $PIPE
+}
+
+mailer_process() {
+  ID=`echo $1 | jq -r ".[$smsindex].id"`
+  RX_TIME=`echo $1 | jq -r ".[$smsindex].rxTime"`
+  TEXT=`echo $1 | jq -r ".[$smsindex].text"`
+  SENDER=`echo $1 | jq -r ".[$smsindex].sender"`
+  EMOJI=`echo -e '\xF0\x9F\x93\xAC'`
+
+  MESSAGE=`printf '*%s NEUE SMS! %s NEUE SMS! %s* \n\n*%s*\n*%s*\n\n%b' "$EMOJI" "$EMOJI" "$EMOJI" "$SENDER" "$RX_TIME" "$TEXT"`
+
+  http \
+        --check-status \
+	--ignore-stdin \
+	--headers \
+	POST "$TELEGRAM_BOT_BASE/sendMessage" \
+	chat_id="$TELEGRAM_CHAT_ID" \
+	parse_mode=markdown \
+	text="$MESSAGE" 
+
+  # re-add to queue
+  if [ $? -neq 0 ]; then
+    push_queue "$1"
+  fi
 }
 
 # collects sms and adds them to the queue
@@ -39,8 +66,7 @@ collector() {
     found=$(collector_find)
 
     if ! [[ -z "$found" ]]; then
-      echo "Writing to pipe"
-      echo "$found" > $PIPE
+      push_queue "$found"
     fi
 
     sleep 2 
