@@ -10,19 +10,19 @@ Practical uses:
 
 ## Install
 
+- Install redis (TODO document setup)
 - Install HTTPie
 - Install jq
 - Telegram: Create bot in bot father
 - Add bot to your telegram group (or create a new one)
 - Gather chat id: `TOKEN="place token here" curl https://api.telegram.org/bot${TOKEN}/getUpdates`
 - Clone repo
-- Set variables in `script.sh`: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, MODEM_ADDR, MODEM_PASSWORD
-- `crontab -e`
+- `cp .env.example .env.local`
+- Update all needed variables in `.env.local`
+- Install as service (TODO documention needed)
 
-Following crontab will poll sms' every 15 seconds.
-```
-* * * * * cd /home/you/sms-forward-bot && ./script.sh 2>&1
-* * * * * sleep 45; cd /home/you/sms-forward-bot && ./script.sh 2>&1
-* * * * * sleep 30; cd /home/you/sms-forward-bot && ./script.sh 2>&1
-* * * * * sleep 15; cd /home/you/sms-forward-bot && ./script.sh 2>&1
-```
+## TODO
+
+- Setup as a service
+- Automatic modem restart to prevent it from freezing up
+- Refactoring
