@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-source .env.local
 TELEGRAM_BOT_BASE="https://api.telegram.org/bot$TELEGRAM_TOKEN"
-
 REDIS="redis-cli"
 REDIS_LIST="sms-forward-bot"
 
