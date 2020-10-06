@@ -93,7 +93,7 @@ collector_find() {
     GET http://$MODEM_ADDR/index.html --session="$HTTP_SESSION"  &> /dev/null
 
   SESSION_ID=`jq -r .cookies.sessionId.value $HTTP_SESSION`
-  TOKEN=`echo $SESSION_ID | cut -d'-' -f2`
+  TOKEN=`echo "$SESSION_ID" | cut -d'-' -f2`
 
   http \
     --ignore-stdin \
@@ -112,10 +112,10 @@ collector_find() {
     GET http://$MODEM_ADDR/api/model.json \
     | jq .sms.msgs)
 
-  echo $data \
+  echo "$data" \
     | jq -r 'to_entries | .[] | select(.value.id != null) | .key' \
     | while read smsindex; do
-    sms_data=$(echo $data | jq -c -r ".[$smsindex]")
+    sms_data=$(echo "$data" | jq -c -r ".[$smsindex]")
     echo "$sms_data"
 
     sms_id=`echo $sms_data | jq -r .id`
