@@ -60,10 +60,10 @@ mailer() {
 
 
 mailer_process() {
-  ID=`echo $1 | jq -r .id`
-  RX_TIME=`echo $1 | jq -r .rxTime`
-  TEXT=`echo $1 | jq -r .text`
-  SENDER=`echo $1 | jq -r .sender`
+  ID=`echo "$1" | jq -r .id`
+  RX_TIME=`echo "$1" | jq -r .rxTime`
+  TEXT=`echo "$1" | jq -r .text`
+  SENDER=`echo "$1" | jq -r .sender`
 
   send_telegram "$ID" "$RX_TIME" "$TEXT" "$SENDER" || lpush_queue "$1"
 }
