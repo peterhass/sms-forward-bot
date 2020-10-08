@@ -21,6 +21,7 @@ Practical uses:
 - Update all needed variables in `.env.local`
 - Try out if your config works: `source .env.local && ./script.sh`
 - `make install`
+- Add `sms-forward-bot` user and group
 - `cp ./sms-forward-bot.service /etc/systemd/system/`
 - `vim /etc/systemd/system/sms-forward-bot.service` apply env updates
 - `systemctl daemon-reload && systemctl start sms-forward-bot.service`
