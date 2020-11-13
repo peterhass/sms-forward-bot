@@ -23,7 +23,8 @@ Practical uses:
 - `make install`
 - Add `sms-forward-bot` user and group
 - `cp ./sms-forward-bot.service /etc/systemd/system/`
-- `vim /etc/systemd/system/sms-forward-bot.service` apply env updates
+- `cp ./sms-forward-bot.env /etc/sms-forward-bot.env`
+- `vim /etc/sms-forward-bot.env` apply config values
 - `systemctl daemon-reload && systemctl start sms-forward-bot.service`
 
 ## TODO
