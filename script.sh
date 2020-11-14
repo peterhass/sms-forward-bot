@@ -168,8 +168,8 @@ restart_modem() {
   echo "$data" \
     | http \
       --ignore-stdin \
+      --headers \
       --form \
-      --verbose \
       --session="$HTTP_SESSION" \
       POST http://$MODEM_ADDR/Forms/Import \
       token="$TOKEN" \
