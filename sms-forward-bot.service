@@ -8,14 +8,11 @@ After=redis.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/sms-forward-bot
+ExecStart=/usr/local/bin/sms-forward-bot --listen
 Restart=always
 User=sms-forward-bot
 Group=sms-forward-bot
-Environment=TELEGRAM_TOKEN=FILL IN
-Environment=TELEGRAM_CHAT_ID=FILL IN
-Environment=MODEM_ADDR=FILL IN
-Environment=MODEM_PASSWORD=FILL IN
+EnvironmentFile=/etc/sms-forward-bot.env
 
 [Install]
 WantedBy=multi-user.target

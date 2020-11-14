@@ -1,0 +1,12 @@
+# /etc/systemd/system/sms-modem-restart.timer
+
+[Unit]
+Description=SMS Forward Bot / Modem Restart
+Requires=sms-modem-restart.service
+
+[Timer]
+Unit=sms-modem-restart.service
+OnCalendar=*-*-* 02:00:00
+
+[Install]
+WantedBy=timers.target

@@ -133,12 +133,73 @@ collector_find() {
   done
 }
 
-echo "Starting collector"
-collector & 
+restart_modem() {
+  HTTP_SESSION=`mktemp`
+  rm "$HTTP_SESSION"
 
-echo "Starting mailer"
-mailer &
+  # create session
+  http \
+    --headers \
+    --ignore-stdin \
+    GET http://$MODEM_ADDR/index.html --session="$HTTP_SESSION"  &> /dev/null
 
-trap cleanup EXIT
-wait
+  SESSION_ID=`jq -r .cookies.sessionId.value $HTTP_SESSION`
+  TOKEN=`echo "$SESSION_ID" | cut -d'-' -f2`
+
+  http \
+    --ignore-stdin \
+    --headers \
+    --form \
+    --session="$HTTP_SESSION" \
+    POST http://$MODEM_ADDR/Forms/config \
+    token="$TOKEN" \
+    "session.password"="$MODEM_PASSWORD" \
+    ok_redirect="/index.html" \
+    err_redirect="/index.html" &> /dev/null
+
+
+
+  config=$(mktemp)
+  http \
+    --ignore-stdin \
+    --session="$HTTP_SESSION" \
+    GET http://$MODEM_ADDR/dui/export.cfg?save=export.cfg > $config
+
+  echo "$data" \
+    | http \
+      --ignore-stdin \
+      --headers \
+      --form \
+      --session="$HTTP_SESSION" \
+      POST http://$MODEM_ADDR/Forms/Import \
+      token="$TOKEN" \
+      ok_redirect="/index.html" \
+      err_redirect="/index.html"  \
+      config@"$config" &> /dev/null
+
+  rm "$config"
+
+}
+
+case "$1" in
+  --restart-modem)  
+    echo "Restarting modem"
+    restart_modem
+    ;;
+
+  --listen)
+    echo "Starting collector"
+    collector & 
+
+    echo "Starting mailer"
+    mailer &
+
+    trap cleanup EXIT
+    wait
+
+    ;;
+
+  *) echo "Usage: $0 [--restart-modem/--listen]" ;;
+esac
+
 

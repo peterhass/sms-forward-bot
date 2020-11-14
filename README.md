@@ -20,13 +20,9 @@ Practical uses:
 - `cp .env.example .env.local`
 - Update all needed variables in `.env.local`
 - Try out if your config works: `source .env.local && ./script.sh`
-- `make install`
 - Add `sms-forward-bot` user and group
-- `cp ./sms-forward-bot.service /etc/systemd/system/`
-- `vim /etc/systemd/system/sms-forward-bot.service` apply env updates
-- `systemctl daemon-reload && systemctl start sms-forward-bot.service`
-
-## TODO
-
-- Automatic modem restart to prevent it from freezing up
-- Refactoring
+- `make install`
+- `cp /etc/sms-forward-bot.env_example /etc/sms-forward-bot.env`
+- Update all needed variables in `vim /etc/sms-forward-bot.env`
+- `systemctl start sms-forward-bot.service`
+- Start on reboot: `systemctl enable sms-forward-bot.service && systemctl enable --now sms-modem-restart.timer`
