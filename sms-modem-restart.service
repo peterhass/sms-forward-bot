@@ -1,0 +1,15 @@
+# /etc/systemd/system/sms-modem-restart.service
+
+[Unit]
+Description=SMS Forward Bot / Modem Restart
+Wants=sms-modem-restart.timer
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sms-forward-bot --restart-modem
+User=sms-forward-bot
+Group=sms-forward-bot
+EnvironmentFile=/etc/sms-forward-bot.env
+
+[Install]
+WantedBy=multi-user.target
