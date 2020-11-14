@@ -22,5 +22,7 @@ Practical uses:
 - Try out if your config works: `source .env.local && ./script.sh`
 - Add `sms-forward-bot` user and group
 - `make install`
+- `cp /etc/sms-forward-bot.env_example /etc/sms-forward-bot.env`
+- Update all needed variables in `vim /etc/sms-forward-bot.env`
 - `systemctl start sms-forward-bot.service`
 - Start on reboot: `systemctl enable sms-forward-bot.service && systemctl enable --now sms-modem-restart.timer`
