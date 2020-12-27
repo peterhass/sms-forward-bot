@@ -27,3 +27,11 @@ Practical uses:
 - Update all needed variables in `vim /etc/sms-forward-bot.env`
 - `systemctl start sms-forward-bot.service`
 - Start on reboot: `systemctl enable sms-forward-bot.service && systemctl enable --now sms-modem-restart.timer`
+
+## Update existing installation
+
+Imprtant note: This will overwrite the systemd services and timers
+
+- `cd sms-forward-bot`
+- `git pull`
+- `make install`
