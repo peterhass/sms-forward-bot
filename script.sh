@@ -22,10 +22,16 @@ lpush_queue() {
   $REDIS LPUSH $REDIS_LIST "$1" &> /dev/null
 }
 
+telegram_markdown_escape() {
+  # inspired from https://github.com/python-telegram-bot/python-telegram-bot/blob/73b0e29a308da7ebb35328e5731bee8db0c423be/telegram/utils/helpers.py#L126
+  echo $(echo "$1" | ruby -pe '$_.gsub!(/([#{Regexp.escape("_*[]()~`>#+-=|{}.!")}])/) { |match| "\\#{match}" }')
+}
+
 send_telegram() {
   ID="$1"
   RX_TIME="$2"
-  TEXT="$3"
+  UNSAFE_TEXT="$3"
+  TEXT=`telegram_markdown_escape "$UNSAFE_TEXT"`
   SENDER="$4"
   EMOJI=`echo -e '\xF0\x9F\x93\xAC'`
 
