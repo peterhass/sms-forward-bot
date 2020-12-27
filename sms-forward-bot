@@ -10,6 +10,10 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+log_info() {
+  echo "$@" 1>&2
+}
+
 pop_queue() {
   $REDIS --raw BLPOP $REDIS_LIST 10 | tail -n1
 }
@@ -37,6 +41,8 @@ send_telegram() {
 
   MESSAGE=`printf '*%s NEUE SMS! %s NEUE SMS! %s* \n\n*%s*\n*%s*\n\n%b' "$EMOJI" "$EMOJI" "$EMOJI" "$SENDER" "$RX_TIME" "$TEXT"`
 
+  log_info "Sending telegram message (sms id $ID, $RX_TIME)"
+
   http \
         --check-status \
 	--ignore-stdin \
@@ -44,11 +50,11 @@ send_telegram() {
 	POST "$TELEGRAM_BOT_BASE/sendMessage" \
 	chat_id="$TELEGRAM_CHAT_ID" \
 	parse_mode=markdown \
-	text="$MESSAGE" 
+	text="$MESSAGE" &> /dev/null
 }
 
 cleanup() {
-  echo "!! CLEANUP !!"
+  log_info "!![CLEANUP]!!"
 
   kill $(jobs -p)
   kill 0
@@ -121,11 +127,13 @@ collector_find() {
   echo "$data" \
     | jq -r 'to_entries | .[] | select(.value.id != null) | .key' \
     | while read -r smsindex; do
+    log_info "New message found on modem"
     sms_data=$(echo "$data" | jq -c -r ".[$smsindex]")
     echo "$sms_data"
 
     sms_id=`echo $sms_data | jq -r .id`
 
+    log_info "Deleting message on modem"
     http \
       --ignore-stdin \
       --headers \

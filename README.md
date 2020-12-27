@@ -6,7 +6,8 @@ Practical uses:
 
 **Important notes**: 
 - Due to limitations in LB1110's software, every forwarded SMS gets deleted on the modem.
-- Modem password and sms are transmitted over http (not encrypted)
+- Due to limitations in LB1110's software, sms with multiple newlines may appear as multiple messages.
+- Modem password and sms are transmitted over http (not encrypted). Don't connect the modem to your network, hook it directly into your machine.
 
 ## Install
 
@@ -26,3 +27,11 @@ Practical uses:
 - Update all needed variables in `vim /etc/sms-forward-bot.env`
 - `systemctl start sms-forward-bot.service`
 - Start on reboot: `systemctl enable sms-forward-bot.service && systemctl enable --now sms-modem-restart.timer`
+
+## Update existing installation
+
+Imprtant note: This will overwrite the systemd services and timers
+
+- `cd sms-forward-bot`
+- `git pull`
+- `make install`
