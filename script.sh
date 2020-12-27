@@ -50,7 +50,7 @@ cleanup() {
 
 mailer() {
   while true; do
-    pop_queue | while read line; do
+    pop_queue | while read -r line; do
       ! [[ -z "$line" ]] && mailer_process "$line"
     done
 
@@ -73,7 +73,7 @@ collector() {
     found=$(collector_find)
 
     if ! [[ -z "$found" ]]; then
-      echo "$found" | while read message; do
+      echo "$found" | while read -r message; do
         rpush_queue "$message"
       done
     fi
@@ -114,7 +114,7 @@ collector_find() {
 
   echo "$data" \
     | jq -r 'to_entries | .[] | select(.value.id != null) | .key' \
-    | while read smsindex; do
+    | while read -r smsindex; do
     sms_data=$(echo "$data" | jq -c -r ".[$smsindex]")
     echo "$sms_data"
 
