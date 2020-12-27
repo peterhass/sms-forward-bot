@@ -6,7 +6,8 @@ Practical uses:
 
 **Important notes**: 
 - Due to limitations in LB1110's software, every forwarded SMS gets deleted on the modem.
-- Modem password and sms are transmitted over http (not encrypted)
+- Due to limitations in LB1110's software, sms with multiple newlines may appear as multiple messages.
+- Modem password and sms are transmitted over http (not encrypted). Don't connect the modem to your network, hook it directly into your machine.
 
 ## Install
 
