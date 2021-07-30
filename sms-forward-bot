@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 
 TELEGRAM_BOT_BASE="https://api.telegram.org/bot$TELEGRAM_TOKEN"
 REDIS="redis-cli"
@@ -32,16 +32,15 @@ telegram_markdown_escape() {
 }
 
 send_telegram() {
-  ID="$1"
-  RX_TIME="$2"
-  UNSAFE_TEXT="$3"
+  RX_TIME="$1"
+  UNSAFE_TEXT="$2"
   TEXT=`telegram_markdown_escape "$UNSAFE_TEXT"`
-  SENDER="$4"
+  SENDER="$3"
   EMOJI=`echo -e '\xF0\x9F\x93\xAC'`
 
   MESSAGE=`printf '*%s NEUE SMS! %s NEUE SMS! %s* \n\n*%s*\n*%s*\n\n%b' "$EMOJI" "$EMOJI" "$EMOJI" "$SENDER" "$RX_TIME" "$TEXT"`
 
-  log_info "Sending telegram message (sms id $ID, $RX_TIME)"
+  log_info "Sending telegram message ($RX_TIME)"
 
   http \
         --check-status \
@@ -72,12 +71,11 @@ mailer() {
 
 
 mailer_process() {
-  ID=`echo "$1" | jq -r .id`
   RX_TIME=`echo "$1" | jq -r .rxTime`
   TEXT=`echo "$1" | jq -r .text`
   SENDER=`echo "$1" | jq -r .sender`
 
-  send_telegram "$ID" "$RX_TIME" "$TEXT" "$SENDER" || lpush_queue "$1"
+  send_telegram "$RX_TIME" "$TEXT" "$SENDER" || lpush_queue "$1"
 }
 
 collector() {
@@ -95,55 +93,20 @@ collector() {
 }
 
 collector_find() {
-  HTTP_SESSION=`mktemp`
-  rm "$HTTP_SESSION"
+  raw_data=$(./receive-sms -f $MODEM_ADDR)
 
-  # create session
-  http \
-    --headers \
-    --ignore-stdin \
-    GET http://$MODEM_ADDR/index.html --session="$HTTP_SESSION"  &> /dev/null
+  if [ $? -ne 0 ]; then
+    return
+  fi
 
-  SESSION_ID=`jq -r .cookies.sessionId.value $HTTP_SESSION`
-  TOKEN=`echo "$SESSION_ID" | cut -d'-' -f2`
-
-  http \
-    --ignore-stdin \
-    --headers \
-    --form \
-    --session="$HTTP_SESSION" \
-    POST http://$MODEM_ADDR/Forms/config \
-    token="$TOKEN" \
-    "session.password"="$MODEM_PASSWORD" \
-    ok_redirect="/index.html" \
-    err_redirect="/index.html" &> /dev/null
-
-  data=$(http \
-    --ignore-stdin \
-    --session="$HTTP_SESSION" \
-    GET http://$MODEM_ADDR/api/model.json \
-    | jq .sms.msgs)
+  data=$(echo "$raw_data" | jq .)
 
   echo "$data" \
-    | jq -r 'to_entries | .[] | select(.value.id != null) | .key' \
+    | jq -r 'to_entries | .[] | .key' \
     | while read -r smsindex; do
     log_info "New message found on modem"
-    sms_data=$(echo "$data" | jq -c -r ".[$smsindex]")
+    sms_data=$(echo "$data" | jq -c -r ".[\"$smsindex\"]")
     echo "$sms_data"
-
-    sms_id=`echo $sms_data | jq -r .id`
-
-    log_info "Deleting message on modem"
-    http \
-      --ignore-stdin \
-      --headers \
-      --form \
-      --session="$HTTP_SESSION" \
-      POST http://$MODEM_ADDR/Forms/config \
-      token="$TOKEN" \
-      ok_redirect="/index.html" \
-      err_redirect="/index.html"  \
-      "sms.deleteId"="$sms_id" &> /dev/null
   done
 }
 

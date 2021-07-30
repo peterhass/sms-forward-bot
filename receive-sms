@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+from dataclasses import dataclass
+import math
+import argparse
+import json
+from telnetlib import Telnet
+from smspdu.codecs import GSM, UCS2
+
+# pip install smspdudecoder
+
+PORT = 5510
+
+
+def disable_echo(tn):
+    tn.write(b"ATE0\r")
+    tn.read_until(b"OK\r\n")
+
+
+def parse_semi_octets(message):
+    steps = range(0, math.ceil(len(message) / 2))
+
+    def to_number(i):
+        part = message[i * 2:i * 2 + 2][::-1]
+
+        if part[1] == 'F':
+            part = part[0]
+
+        return part
+
+    return "".join(list(map(to_number, steps)))
+
+
+def parse_hex_octets(message):
+    return list(bytearray.fromhex(message))
+
+
+def partition_string(string, length, map_fn=lambda v: v):
+    left = map_fn(string[0:length])
+    right = string[length:]
+
+    return (left, right)
+
+
+SCHEME_DECODER_MAPPING = {
+    0: GSM.decode,
+    8: UCS2.decode
+}
+
+
+def get_tp_message_decoder(tp_coding_scheme):
+    return SCHEME_DECODER_MAPPING[tp_coding_scheme]
+
+
+def get_tp_message_length(tp_coding_scheme, tp_user_data_length):
+    if SCHEME_DECODER_MAPPING[tp_coding_scheme] is GSM.decode:
+        return tp_user_data_length
+
+    return tp_user_data_length * 2
+
+
+SMSC_TYPE_INTERNATIONAL = 0x91
+SMSC_TYPE_NATIONAL = 0x81
+
+def get_semi_octets_request_length(len):
+    if len % 2 == 1:
+        return len + 1
+    return len
+
+@dataclass
+class MessageFlags:
+    tp_message_type_indicator: int
+    tp_more_messages_to_send: bool
+    tp_status_report_indicator: bool
+    tp_reply_path: bool
+    tp_user_data_header_indicator: bool
+
+def parse_message_flags(raw_message):
+    [num_val] = parse_hex_octets(raw_message)
+    tp_message_type_indicator = num_val & 0b11
+    tp_more_messages_to_send = bool(num_val & (1 << 2))
+    tp_status_report_indicator = bool(num_val & 0b100000)
+    tp_reply_path = bool(num_val & (1 << 7))
+    tp_user_data_header_indicator = bool(num_val & (1 << 6))
+
+    return MessageFlags(
+        tp_message_type_indicator=tp_message_type_indicator,
+        tp_more_messages_to_send=tp_more_messages_to_send,
+        tp_status_report_indicator=tp_status_report_indicator,
+        tp_reply_path=tp_reply_path,
+        tp_user_data_header_indicator=tp_user_data_header_indicator
+    )
+
+@dataclass
+class InformationElementConcatMessage:
+    csms_reference_number: int
+    part_number: int
+    parts_total: int
+
+    @classmethod
+    def parse(cls, message):
+        [csms_reference_number], message = partition_string(message, 2, parse_hex_octets)
+        [parts_total], message = partition_string(message, 2, parse_hex_octets)
+        [part_number], message = partition_string(message, 2, parse_hex_octets)
+
+        return cls(
+            csms_reference_number=csms_reference_number,
+            part_number=part_number,
+            parts_total=parts_total
+        )
+
+INFORMATION_ELEMENT_PARSERS = {
+    0: InformationElementConcatMessage.parse
+}
+
+def get_information_element_parser(information_element_id):
+    if information_element_id in INFORMATION_ELEMENT_PARSERS:
+        return INFORMATION_ELEMENT_PARSERS[information_element_id]
+    return lambda a: None
+
+def parse_information_elements(message):
+    information_elements = []
+
+    while message:
+        [information_element_id], message = partition_string(message, 2, parse_hex_octets)
+        [information_element_length], message = partition_string(message, 2, parse_hex_octets)
+        information_element, message = partition_string(
+            message,
+            information_element_length * 2,
+            get_information_element_parser(information_element_id)
+        )
+        if information_element: information_elements.append(information_element)
+
+    return information_elements
+
+def format_pdu_message(message):
+    [smsc_length], message = partition_string(message, 2, parse_hex_octets)
+    [smsc_type], message = partition_string(message, 2, parse_hex_octets)
+    service_center_number_length = smsc_length * 2 - 2
+    service_center_number, message = partition_string(message, service_center_number_length, parse_semi_octets)
+
+    # ONLY APPLIES TO SMS-DELIVER
+
+    message_flags, message = partition_string(message, 2, parse_message_flags)
+
+    [address_length], message = partition_string(message, 2, parse_hex_octets)
+    [address_type], message = partition_string(message, 2, parse_hex_octets)
+    tp_originating_address, message = partition_string(message, get_semi_octets_request_length(address_length), parse_semi_octets)
+
+    [tp_protocol_id], message = partition_string(message, 2, parse_hex_octets)
+    [tp_coding_scheme], message = partition_string(message, 2, parse_hex_octets)
+    tp_service_centre_time_stamp, message = partition_string(message, 14, parse_semi_octets)
+    [tp_user_data_length], message = partition_string(message, 2, parse_hex_octets)
+
+    if message_flags.tp_user_data_header_indicator:
+        [tp_user_data_header_length], message = partition_string(message, 2, parse_hex_octets)
+        information_elements, message = partition_string(message, tp_user_data_header_length * 2, parse_information_elements)
+        print(f"{information_elements=}")
+
+    tp_message, message = partition_string(
+        message,
+        get_tp_message_length(tp_coding_scheme, tp_user_data_length),
+        get_tp_message_decoder(tp_coding_scheme)
+    )
+
+    return {
+        'text': tp_message,
+        'sender': tp_originating_address,
+        'rxTime': tp_service_centre_time_stamp,
+    }
+
+
+def format_sms_response(response):
+    parts = response.decode().strip().split("\n")
+    meta_info = {}
+    message_data = {}
+
+    active_index = None
+    for line in parts:
+        if line.startswith("+CMGL:"):
+            _, _, command_values_str = line.strip().partition("+CMGL: ")
+            meta_strings = command_values_str.split(",")
+            active_index = int(meta_strings[0])
+            meta_info[active_index] = meta_strings
+        elif active_index is not None:
+            message_data[active_index] = format_pdu_message(line.strip())
+            active_index = None
+
+    return (meta_info, message_data)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Receive SMS from modem")
+    parser.add_argument('host')
+    parser.add_argument('-f', '--flush', action="store_true")
+    args = parser.parse_args()
+
+    with Telnet(args.host, PORT) as tn:
+        disable_echo(tn)
+        tn.write(b"AT+CMGL=4\r")
+        response = tn.read_until(b"OK\r\n")
+        meta_info, message_data = format_sms_response(response)
+
+        print(json.dumps(message_data))
+
+        if args.flush:
+            indicies = [*meta_info]
+            for index in indicies:
+                tn.write((f"AT+CMGD={index}\r").encode())
+                tn.read_until(b"OK\r\n")
+
+
+if __name__ == "__main__":
+    main()
+
+# die dat-at tan sms zreissts komplett
+# ma muss etwas gemacht werdenm
