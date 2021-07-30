@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import typing
 from dataclasses import dataclass
 import math
 import argparse
@@ -61,10 +62,12 @@ def get_tp_message_length(tp_coding_scheme, tp_user_data_length):
 SMSC_TYPE_INTERNATIONAL = 0x91
 SMSC_TYPE_NATIONAL = 0x81
 
+
 def get_semi_octets_request_length(len):
     if len % 2 == 1:
         return len + 1
     return len
+
 
 @dataclass
 class MessageFlags:
@@ -74,21 +77,23 @@ class MessageFlags:
     tp_reply_path: bool
     tp_user_data_header_indicator: bool
 
-def parse_message_flags(raw_message):
-    [num_val] = parse_hex_octets(raw_message)
-    tp_message_type_indicator = num_val & 0b11
-    tp_more_messages_to_send = bool(num_val & (1 << 2))
-    tp_status_report_indicator = bool(num_val & 0b100000)
-    tp_reply_path = bool(num_val & (1 << 7))
-    tp_user_data_header_indicator = bool(num_val & (1 << 6))
+    @classmethod
+    def parse(cls, message):
+        [num_val] = parse_hex_octets(message)
+        tp_message_type_indicator = num_val & 0b11
+        tp_more_messages_to_send = bool(num_val & (1 << 2))
+        tp_status_report_indicator = bool(num_val & 0b100000)
+        tp_reply_path = bool(num_val & (1 << 7))
+        tp_user_data_header_indicator = bool(num_val & (1 << 6))
 
-    return MessageFlags(
-        tp_message_type_indicator=tp_message_type_indicator,
-        tp_more_messages_to_send=tp_more_messages_to_send,
-        tp_status_report_indicator=tp_status_report_indicator,
-        tp_reply_path=tp_reply_path,
-        tp_user_data_header_indicator=tp_user_data_header_indicator
-    )
+        return cls(
+            tp_message_type_indicator=tp_message_type_indicator,
+            tp_more_messages_to_send=tp_more_messages_to_send,
+            tp_status_report_indicator=tp_status_report_indicator,
+            tp_reply_path=tp_reply_path,
+            tp_user_data_header_indicator=tp_user_data_header_indicator
+        )
+
 
 @dataclass
 class InformationElementConcatMessage:
@@ -108,14 +113,17 @@ class InformationElementConcatMessage:
             parts_total=parts_total
         )
 
+
 INFORMATION_ELEMENT_PARSERS = {
     0: InformationElementConcatMessage.parse
 }
+
 
 def get_information_element_parser(information_element_id):
     if information_element_id in INFORMATION_ELEMENT_PARSERS:
         return INFORMATION_ELEMENT_PARSERS[information_element_id]
     return lambda a: None
+
 
 def parse_information_elements(message):
     information_elements = []
@@ -132,40 +140,71 @@ def parse_information_elements(message):
 
     return information_elements
 
-def format_pdu_message(message):
-    [smsc_length], message = partition_string(message, 2, parse_hex_octets)
-    [smsc_type], message = partition_string(message, 2, parse_hex_octets)
-    service_center_number_length = smsc_length * 2 - 2
-    service_center_number, message = partition_string(message, service_center_number_length, parse_semi_octets)
 
-    # ONLY APPLIES TO SMS-DELIVER
+@dataclass
+class Message:
+    smsc_type: int
+    service_center_number: str
+    message_flags: MessageFlags
+    address_type: int
+    tp_originating_address: str
+    tp_protocol_id: int
+    tp_coding_scheme: int
+    tp_service_centre_time_stamp: int
+    information_elements: typing.List
+    tp_message: str
 
-    message_flags, message = partition_string(message, 2, parse_message_flags)
+    @classmethod
+    def parse(cls, message):
+        [smsc_length], message = partition_string(message, 2, parse_hex_octets)
+        [smsc_type], message = partition_string(message, 2, parse_hex_octets)
+        service_center_number_length = smsc_length * 2 - 2
+        service_center_number, message = partition_string(message, service_center_number_length, parse_semi_octets)
 
-    [address_length], message = partition_string(message, 2, parse_hex_octets)
-    [address_type], message = partition_string(message, 2, parse_hex_octets)
-    tp_originating_address, message = partition_string(message, get_semi_octets_request_length(address_length), parse_semi_octets)
+        # ONLY APPLIES TO SMS-DELIVER
 
-    [tp_protocol_id], message = partition_string(message, 2, parse_hex_octets)
-    [tp_coding_scheme], message = partition_string(message, 2, parse_hex_octets)
-    tp_service_centre_time_stamp, message = partition_string(message, 14, parse_semi_octets)
-    [tp_user_data_length], message = partition_string(message, 2, parse_hex_octets)
+        message_flags, message = partition_string(message, 2, MessageFlags.parse)
 
-    if message_flags.tp_user_data_header_indicator:
-        [tp_user_data_header_length], message = partition_string(message, 2, parse_hex_octets)
-        information_elements, message = partition_string(message, tp_user_data_header_length * 2, parse_information_elements)
-        print(f"{information_elements=}")
+        [address_length], message = partition_string(message, 2, parse_hex_octets)
+        [address_type], message = partition_string(message, 2, parse_hex_octets)
+        tp_originating_address, message = partition_string(message, get_semi_octets_request_length(address_length),
+                                                           parse_semi_octets)
 
-    tp_message, message = partition_string(
-        message,
-        get_tp_message_length(tp_coding_scheme, tp_user_data_length),
-        get_tp_message_decoder(tp_coding_scheme)
-    )
+        [tp_protocol_id], message = partition_string(message, 2, parse_hex_octets)
+        [tp_coding_scheme], message = partition_string(message, 2, parse_hex_octets)
+        tp_service_centre_time_stamp, message = partition_string(message, 14, parse_semi_octets)
+        [tp_user_data_length], message = partition_string(message, 2, parse_hex_octets)
 
+        if message_flags.tp_user_data_header_indicator:
+            [tp_user_data_header_length], message = partition_string(message, 2, parse_hex_octets)
+            information_elements, message = partition_string(message, tp_user_data_header_length * 2,
+                                                             parse_information_elements)
+
+        tp_message, message = partition_string(
+            message,
+            get_tp_message_length(tp_coding_scheme, tp_user_data_length),
+            get_tp_message_decoder(tp_coding_scheme)
+        )
+
+        return cls(
+            smsc_type=smsc_type,
+            service_center_number=service_center_number,
+            message_flags=message_flags,
+            address_type=address_type,
+            tp_originating_address=tp_originating_address,
+            tp_protocol_id=tp_protocol_id,
+            tp_coding_scheme=tp_coding_scheme,
+            tp_service_centre_time_stamp=tp_service_centre_time_stamp,
+            information_elements=information_elements,
+            tp_message=tp_message
+        )
+
+
+def format_message_for_output(message):
     return {
-        'text': tp_message,
-        'sender': tp_originating_address,
-        'rxTime': tp_service_centre_time_stamp,
+        'text': message.tp_message,
+        'sender': message.tp_originating_address,
+        'rxTime': message.tp_service_centre_time_stamp,
     }
 
 
@@ -182,7 +221,10 @@ def format_sms_response(response):
             active_index = int(meta_strings[0])
             meta_info[active_index] = meta_strings
         elif active_index is not None:
-            message_data[active_index] = format_pdu_message(line.strip())
+            message_data[active_index] = format_message_for_output(
+                Message.parse(line.strip())
+            )
+
             active_index = None
 
     return (meta_info, message_data)
@@ -211,6 +253,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# die dat-at tan sms zreissts komplett
-# ma muss etwas gemacht werdenm
