@@ -227,8 +227,6 @@ def format_sms_response(response):
 
             active_index = None
 
-    return (meta_info, message_data)
-
 
 def main():
     parser = argparse.ArgumentParser(description="Receive SMS from modem")
