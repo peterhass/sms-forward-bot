@@ -5,15 +5,15 @@ Practical uses:
 - "Redirect" two factor authentication messages to telegram
 
 **Important notes**: 
-- Due to limitations in LB1110's software, every forwarded SMS gets deleted on the modem.
-- Due to limitations in LB1110's software, sms with multiple newlines may appear as multiple messages.
-- Modem password and sms are transmitted over http (not encrypted). Don't connect the modem to your network, hook it directly into your machine.
+- Every forwarded SMS gets deleted on the modem.
+- Modem password and sms are transmitted as cleartext. Don't connect the modem to your network, hook it directly into your machine.
 
 ## Install
 
 - Install redis
 - Install HTTPie
 - Install jq
+- Install python3-setuptools `apt-get install python3-setuptools`
 - Telegram: Create bot in bot father
 - Add bot to your telegram group (or create a new one)
 - Gather chat id: `TOKEN="place token here" curl https://api.telegram.org/bot${TOKEN}/getUpdates`
