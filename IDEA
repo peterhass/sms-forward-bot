@@ -1,5 +1,0 @@
-- telnet 192.168.1.98 5510
-- read sms AT+CMGL="ALL"
-- returns data in SMS PDU format https://www.gsmfavorites.com/documents/sms/pdutext/
-- all commands https://www.telit.com/wp-content/uploads/2018/03/Telit-LN940-Series-AT-Command-User-Guide-r1.pdf
-- delete message: AT+CMGD=<index>[,<delflag>]
