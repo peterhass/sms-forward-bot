@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+from receive_sms.cli import run_cli
+
+run_cli()

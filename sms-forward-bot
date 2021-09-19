@@ -1,8 +1,9 @@
-#!/usr/bin/env bash -x
+#!/usr/bin/env bash
 
 TELEGRAM_BOT_BASE="https://api.telegram.org/bot$TELEGRAM_TOKEN"
 REDIS="redis-cli"
 REDIS_LIST="sms-forward-bot"
+RECEIVE_SMS="/usr/local/bin/receive_sms"
 
 $REDIS info clients &> /dev/null
 if [ $? -ne 0 ]; then
@@ -93,7 +94,7 @@ collector() {
 }
 
 collector_find() {
-  raw_data=$(./receive-sms -f $MODEM_ADDR)
+  raw_data=$($RECEIVE_SMS -f $MODEM_ADDR)
 
   if [ $? -ne 0 ]; then
     return
@@ -105,7 +106,7 @@ collector_find() {
     | jq -r 'to_entries | .[] | .key' \
     | while read -r smsindex; do
     log_info "New message found on modem"
-    sms_data=$(echo "$data" | jq -c -r ".[\"$smsindex\"]")
+    sms_data=$(echo "$data" | jq -c -r ".[$smsindex]")
     echo "$sms_data"
   done
 }
